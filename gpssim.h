@@ -10,21 +10,21 @@
 #define TRUE	(1)
 #define FALSE	(0)
 
-/*! \brief Maximum length of a line in a text file (RINEX, motion) */
-#define MAX_CHAR (100)
+/* Maximum length of a line in a text file (RINEX, motion) */
+#define MAX_CHAR (80)
 
-/*! \brief Maximum number of satellites in RINEX file */
+/*Maximum number of satellites in RINEX file */
 #define MAX_SAT (32)
 
-/*! \brief Maximum number of channels we simulate */
+/*Maximum number of channels we simulate */
 #define MAX_CHAN (16)
 
-/*! \brief Maximum number of user motion points */
+/*Maximum number of user motion points */
 #ifndef USER_MOTION_SIZE
 #define USER_MOTION_SIZE (3000) // max duration at 10Hz
 #endif
 
-/*! \brief Maximum duration for static mode*/
+/*Maximum duration for static mode*/
 #define STATIC_MAX_DURATION (86400) // second
 
 // L1C parameters 
@@ -67,9 +67,9 @@
 #define SPEED_OF_LIGHT 2.99792458e8
 #define LAMBDA_L1 0.190293672798365
 
-/*! \brief GPS L1 Carrier frequency */
+/*GPS L1 Carrier frequency */
 #define CARR_FREQ (1575.42e6)
-/*! \brief C/A code frequency */
+/*C/A code frequency */
 #define CODE_FREQ (1.023e6)
 #define CARR_TO_CODE (1.0/1540.0)
 
@@ -84,14 +84,14 @@
 
 #define EPHEM_ARRAY_SIZE (15) // for daily GPS broadcast ephemers file (brdc)
 
-/*! \brief Structure representing GPS time */
+/*Structure representing GPS time */
 typedef struct
 {
 	int week;	/*!< GPS week number (since January 1980) */
 	double sec; 	/*!< second inside the GPS \a week */
 } gpstime_t;
 
-/*! \brief Structure repreenting UTC time */
+/*Structure repreenting UTC time */
 typedef struct
 {
 	int y; 		/*!< Calendar year */
@@ -102,7 +102,7 @@ typedef struct
 	double sec;	/*!< Calendar seconds */
 } datetime_t;
 
-/*! \brief Structure representing ephemeris of a single satellite */
+/*Structure representing ephemeris of a single satellite */
 typedef struct
 {
 	int vflg;	/*!< Valid Flag */
@@ -137,6 +137,16 @@ typedef struct
 	double sq1e2;	/*!< sqrt(1-e^2) */
 	double A;	/*!< Semi-major axis */
 	double omgkdot; /*!< OmegaDot-OmegaEdot */
+
+	// --- L1C/CNAV-specific fields ---
+	int cnav_type;         // CNAV message type (10, 11, 30, 33, etc.)
+	double cnav_clock[4];  // Extra clock parameters (e.g., af0, af1, af2, af3)
+	double cnav_ura;       // User Range Accuracy
+	double cnav_health;    // Health status
+	double cnav_groupdelay;// Group delay
+	double cnav_toc;       // CNAV Time of Clock
+	double cnav_tgd;       // CNAV TGD
+	// Add more as needed for full L1C/CNAV support
 } ephem_t;
 
 typedef struct
@@ -162,7 +172,7 @@ typedef struct
 	double iono_delay;
 } range_t;
 
-/*! \brief Structure representing an L1C Channel */
+/*Structure representing an L1C Channel */
 typedef struct {
     int prn;                    /*< PRN Number */
     int *l1c_code;             /*< L1C spreading code */

@@ -842,17 +842,18 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 {
 	FILE *fp;
 	int ieph;
-
 	int sv;
 	char str[MAX_CHAR];
 	char tmp[20];
-
 	datetime_t t;
 	gpstime_t g;
 	gpstime_t g0;
 	double dt;
-
 	int flags = 0x0;
+
+	int isL1C = 0;
+	int in_cnav_csv = 0; // Track if we're in the CNAV CSV section
+	int header_done = 0; // Track if header is done
 
 	if (NULL==(fp=fopen(fname, "rt")))
 		return(-1);
@@ -868,8 +869,21 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 		if (NULL==fgets(str, MAX_CHAR, fp))
 			break;
 
-		if (strncmp(str+60, "END OF HEADER", 13)==0)
+		// Detect L1C navigation file by header or comments
+		if (strstr(str, "L1C") || strstr(str, "CNAV") || strstr(str, "L1C CNAV")) {
+			isL1C = 1;
+			// Only print once
+			static int info_printed = 0;
+			if (!info_printed) {
+				fprintf(stderr, "INFO: Detected L1C/CNAV navigation file format.\n");
+				info_printed = 1;
+			}
+		}
+
+		if (strncmp(str+60, "END OF HEADER", 13)==0) {
+			header_done = 1;
 			break;
+		}
 		else if (strncmp(str+60, "ION ALPHA", 9)==0)
 		{
 			strncpy(tmp, str+2, 12);
@@ -957,14 +971,61 @@ int readRinexNavAll(ephem_t eph[][MAX_SAT], ionoutc_t *ionoutc, const char *fnam
 	if (flags==0xF) // Read all Iono/UTC lines
 		ionoutc->vflg = TRUE;
 
+	// --- Skip CNAV CSV blocks after header ---
+	if (isL1C) {
+		long pos_after_header = ftell(fp);
+		while (fgets(str, MAX_CHAR, fp)) {
+			// If line is a CNAV CSV (starts with 10, 11, 30, 33, etc.), skip
+			if ((str[0] == '1' && (str[1] == '0' || str[1] == '1')) ||
+			    (str[0] == '3' && (str[1] == '0' || str[1] == '3'))) {
+				pos_after_header = ftell(fp);
+				continue;
+			}
+			// If line is a comment or blank, skip
+			if (str[0] == '#' || str[0] == '\n' || str[0] == '\r') {
+				pos_after_header = ftell(fp);
+				continue;
+			}
+			// If line looks like a RINEX block (starts with 'G'), rewind and break
+			if (str[0] == 'G') {
+				fseek(fp, pos_after_header, SEEK_SET);
+				break;
+			}
+			pos_after_header = ftell(fp);
+		}
+	}
+
 	// Read ephemeris blocks
 	g0.week = -1;
 	ieph = 0;
 
-	while (1)
-	{
-		if (NULL==fgets(str, MAX_CHAR, fp))
+	while (1) {
+		if (NULL==fgets(str, MAX_CHAR, fp)) {
+			fprintf(stderr, "INFO: Reached till line %d: %d\n", __LINE__, isL1C);
 			break;
+		}
+		fprintf(stderr, "%s\n", str);
+
+		// --- Handle CNAV CSV blocks at the top of the file ---
+		if (isL1C) {
+			// If line starts with a CNAV message type (e.g., "10,", "11,", "30,", "33,")
+			if ((str[0] == '1' && (str[1] == '0' || str[1] == '1')) ||
+			    (str[0] == '3' && (str[1] == '0' || str[1] == '3'))) {
+				in_cnav_csv = 1;
+				continue; // skip CNAV CSV lines
+			}
+			// If line is a comment or blank, skip
+			if (str[0] == '#' || str[0] == '\n' || str[0] == '\r')
+				continue;
+			// If we reach a line starting with 'G' or a digit (RINEX block), stop skipping
+			if (str[0] == 'G' || (str[0] >= '0' && str[0] <= '9')) {
+				in_cnav_csv = 0;
+				// fall through to normal RINEX parsing
+			}
+			// If still in CNAV CSV, skip
+			if (in_cnav_csv)
+				continue;
+		}
 
 		// PRN
 		strncpy(tmp, str, 2);
@@ -1359,6 +1420,7 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt)
     chan->sym_idx = (int)(ms / (L1C_CODE_RATE/L1C_SYMB_RATE)) % L1C_SYMB_LEN;
 
     // Save current pseudorange
+
     chan->rho0 = rho1;
 
     return;
@@ -1366,6 +1428,7 @@ void computeCodePhase(channel_t *chan, range_t rho1, double dt)
 
 /*! \brief Read the list of user motions from the input file
  *  \param[out] xyz Output array of ECEF vectors for user motion
+
  *  \param[[in] filename File name of the text input file
  *  \returns Number of user data motion records read, -1 on error
  */
@@ -2521,7 +2584,7 @@ void l1c_gen_signal(channel_t *chan, double *i_buff, double *q_buff, int length)
         double code_symb = code * symb;
         i_buff[i] = code_symb * cos(carr_phase);
         q_buff[i] = code_symb * sin(carr_phase);
-        
+
         // Carrier phase update
         carr_phase += 2.0 * PI * chan->rho0.rate / L1C_CARRIER_FREQ;
         if (carr_phase > 2.0 * PI)

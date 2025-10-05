@@ -94,19 +94,19 @@ Options:
 The user motion can be specified in either dynamic or static mode:
 
 ```
-> gps-sdr-sim -e brdc3540.14n -u circle.csv
+> gps-sdr-sim -e brdc_l1c.nav -u examples/circle_l1c.csv
 ```
 
 ```
-> gps-sdr-sim -e brdc3540.14n -x circle_llh.csv
+> gps-sdr-sim -e brdc_l1c.nav -x circle_llh.csv
 ```
 
 ```
-> gps-sdr-sim -e brdc3540.14n -g triumphv3.txt
+> gps-sdr-sim -e brdc_l1c.nav -g triumphv3.txt
 ```
 
 ```
-> gps-sdr-sim -e brdc3540.14n -l 30.286502,120.032669,100
+> gps-sdr-sim -e brdc_l1c.nav -l 30.286502,120.032669,100
 ```
 
 ### Transmitting the samples
